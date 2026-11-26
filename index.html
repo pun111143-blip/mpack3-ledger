@@ -733,7 +733,7 @@ function renderMonth() {
     </div>
   </section>`;
 
-  /* --- 지출 3분류 --- */
+  /* --- 지출 4분류 (① 고정비 / ② 물품비용 / ③ 인건비 / ④ 수리·관리비) --- */
   html += `<h2 class="card" style="background:none;border:0;box-shadow:none;margin:16px 0 8px;padding:0;font-size:12.5px;color:var(--text)">
       지출 구성 <span style="font-weight:600;color:var(--muted);font-size:11.5px">합계 ${won(expense)}원</span></h2>`;
 
@@ -773,40 +773,51 @@ function sparkBars(daily) {
 function buildCats(exp, totalExpense) {
   const f = exp.fixed || { subtotal: 0, items: [] };
   const g = exp.goods || { subtotal: 0, online: {}, onsite: {}, liquor: {} };
-  const e = exp.etc || { subtotal: 0, repair: {}, labor: {} };
+  const e = exp.etc || {};
   const on = g.online || { subtotal: 0, items: [] };
   const os = g.onsite || { subtotal: 0, items: [] };
   const lq = g.liquor || { subtotal: 0, items: [] };
-  const rp = e.repair || { subtotal: 0, items: [] };
-  const lb = e.labor || { subtotal: 0, items: [] };
+  // 4분류 응답(labor·repair)을 먼저 쓰고, 예전 응답(etc 아래 repair·labor)도 그대로 읽습니다.
+  const lb = exp.labor || e.labor || { subtotal: 0, items: [] };
+  const rp = exp.repair || e.repair || { subtotal: 0, items: [] };
+  const sum = o => {
+    const st = Number(o.subtotal);
+    if (st) return st;
+    return (o.items || []).reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  };
 
   return [
     {
       no: '①', title: '고정비', sub: '월세 · 공과금 · 구독',
-      amount: Number(f.subtotal) || 0,
+      amount: sum(f),
       groups: [{
         label: '', items: (f.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount }))
       }]
     },
     {
       no: '②', title: '물품비용', sub: '온라인 · 현장 · 주류',
-      amount: Number(g.subtotal) || 0,
+      amount: sum(g),
       groups: [
-        { label: '온라인 물품', amount: Number(on.subtotal) || 0, items: (on.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount })) },
-        { label: '현장 지출', amount: Number(os.subtotal) || 0, items: (os.items || []).map(x => ({ name: x.vendor, memo: (x.date ? x.date + ' · ' : '') + (x.memo || ''), amount: x.amount })) },
-        { label: '주류·음료', amount: Number(lq.subtotal) || 0, items: (lq.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount })) }
+        { label: '온라인 물품', amount: sum(on), items: (on.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount })) },
+        { label: '현장 지출', amount: sum(os), items: (os.items || []).map(x => ({ name: x.vendor, memo: (x.date ? x.date + ' · ' : '') + (x.memo || ''), amount: x.amount })) },
+        { label: '주류·음료', amount: sum(lq), items: (lq.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount })) }
       ]
     },
     {
-      no: '③', title: '수리·관리·인건비', sub: '알바 급여 포함',
-      amount: Number(e.subtotal) || 0,
-      groups: [
-        { label: '수리·관리', amount: Number(rp.subtotal) || 0, items: (rp.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount })) },
-        { label: '인건비', amount: Number(lb.subtotal) || 0, items: (lb.items || []).map(x => ({ name: x.name || x.type, memo: [x.type, x.memo].filter(Boolean).join(' · '), amount: x.amount })) }
-      ]
+      no: '③', title: '인건비', sub: '알바 급여',
+      amount: sum(lb),
+      groups: [{
+        label: '', items: (lb.items || []).map(x => ({ name: x.name || x.type, memo: x.memo || '', amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
+      }]
+    },
+    {
+      no: '④', title: '수리·관리비', sub: '수리 · 기타 비정기 지출',
+      amount: sum(rp),
+      groups: [{
+        label: '', items: (rp.items || []).map(x => ({ name: x.name || x.type, memo: [x.type && x.name ? x.type : '', x.memo].filter(Boolean).join(' · '), amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
+      }]
     }
-  ].filter(c => c.amount > 0 || c.groups.some(g2 => (g2.items || []).length || g2.amount > 0))
-   .map(c => ({ ...c, share: totalExpense ? c.amount / totalExpense : 0 }));
+  ].map(c => ({ ...c, share: totalExpense ? c.amount / totalExpense : 0 }));
 }
 
 function catCard(c, idx) {
@@ -906,9 +917,7 @@ function renderTrend() {
         <div class="bar-row"><span class="k">매출</span><span class="bar-track"><i class="rev" style="width:${rev / maxV * 100}%"></i></span><span class="v">${rev ? wonK(rev) : '–'}</span></div>
         <div class="bar-row"><span class="k">지출</span><span class="bar-track"><i class="exp" style="width:${exp / maxV * 100}%"></i></span><span class="v">${exp ? wonK(exp) : '–'}</span></div>
         <div class="split">
-          <div class="kv"><span>고정비</span><b>${wonK(t.fixed)}</b></div>
-          <div class="kv"><span>물품비용</span><b>${wonK(t.goods)}</b></div>
-          <div class="kv"><span>수리·관리·인건비</span><b>${wonK(t.etc)}</b></div>
+          ${trendSplit(t)}
           <div class="kv"><span>현금/카드/이체</span><b>${wonK(t.cash)}/${wonK(t.card)}/${wonK(t.transfer)}</b></div>
         </div>
       </div>`;
@@ -928,6 +937,22 @@ function renderTrend() {
   </section>`;
   $('#view').innerHTML = html;
   $('#metaLine').textContent = `월별 추이 · ${updatedText(d.updatedAt)}`;
+}
+
+/* 월별 추이 한 달치 지출 4분류 줄. 새 응답(labor·repair)이 없으면 예전 etc 한 칸으로 보여줍니다. */
+function trendSplit(t) {
+  const hasSplit = (t.labor != null || t.repair != null);
+  const rows = [
+    ['① 고정비', Number(t.fixed) || 0],
+    ['② 물품비용', Number(t.goods) || 0]
+  ];
+  if (hasSplit) {
+    rows.push(['③ 인건비', Number(t.labor) || 0]);
+    rows.push(['④ 수리·관리비', Number(t.repair) || 0]);
+  } else {
+    rows.push(['수리·관리·인건비', Number(t.etc) || 0]);
+  }
+  return rows.map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${wonK(v)}</b></div>`).join('');
 }
 
 function renderFoot() {
@@ -985,6 +1010,8 @@ function demoPayload(month) {
     expense: {
       fixed: { subtotal: fixed, items: fixedItems },
       goods: { subtotal: goods, online, onsite, liquor },
+      labor: { subtotal: labor.subtotal, items: labor.items },
+      repair: { subtotal: repair.subtotal, items: repair.items },
       etc: { subtotal: etc, repair, labor }
     },
     notes: ['예시 화면입니다. 실제 시트를 연결하면 이 자리에 시트의 참고 메모가 표시됩니다.'],
@@ -993,8 +1020,8 @@ function demoPayload(month) {
 }
 function demoTrend() {
   return [
-    { month: '11월', revenue: 9200000, expense: 7100000, profit: 2100000, cash: 1100000, card: 7200000, transfer: 900000, fixed: 4700000, goods: 2000000, etc: 400000 },
-    { month: '12월', revenue: 3100000, expense: 4400000, profit: -1300000, cash: 350000, card: 2400000, transfer: 350000, fixed: 4300000, goods: 100000, etc: 0 }
+    { month: '11월', revenue: 9200000, expense: 7100000, profit: 2100000, cash: 1100000, card: 7200000, transfer: 900000, fixed: 4700000, goods: 2000000, labor: 1200000, repair: 200000, etc: 1400000 },
+    { month: '12월', revenue: 3100000, expense: 4400000, profit: -1300000, cash: 350000, card: 2400000, transfer: 350000, fixed: 4300000, goods: 100000, labor: 0, repair: 0, etc: 0 }
   ];
 }
 

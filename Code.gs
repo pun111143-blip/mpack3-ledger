@@ -92,7 +92,7 @@ function buildPayload_(monthParam) {
   if (!month) return { ok: false, code: 'nomon', message: '월 시트를 찾지 못했습니다' };
 
   var cache = CacheService.getScriptCache();
-  var key = 'ledger1:' + month;
+  var key = 'ledger2:' + month;
   var hit = cache.get(key);
   if (hit) {
     try { return JSON.parse(hit); } catch (e) {}
@@ -145,20 +145,22 @@ function parseMonth_(values, month, title, months) {
     }
   }
 
-  /* --- 지출 3분류 (소계 줄을 기준으로 위로 거슬러 항목을 모음) --- */
+  /* --- 지출 4분류 (① 고정비 / ② 물품비용 / ③ 인건비 / ④ 수리·관리비) ---
+         소계 줄을 기준으로 위로 거슬러 항목을 모음 --- */
   var fixed  = section_(values, '고정비 소계');
   var online = section_(values, '온라인 소계');
   var onsite = section_(values, '현장 소계');
   var liquor = section_(values, '주류·음료 소계');
-  var repair = section_(values, '수리·관리 소계');
   var labor  = section_(values, '인건비 소계');
+  var repair = section_(values, '수리·관리 소계');
 
-  var fixedSub  = fixed.subtotal  || N(labelVal_(values, '① 고정비', 3));
-  var onlineSub = online.subtotal;
-  var onsiteSub = onsite.subtotal;
-  var liquorSub = liquor.subtotal;
+  var fixedSub  = fixed.subtotal  || N(labelVal_(values, '① 고정비', 3))     || sumItems_(fixed.items);
+  var onlineSub = online.subtotal || sumItems_(online.items);
+  var onsiteSub = onsite.subtotal || sumItems_(onsite.items);
+  var liquorSub = liquor.subtotal || sumItems_(liquor.items);
   var goodsSub  = N(labelVal_(values, '② 물품비용', 3)) || (onlineSub + onsiteSub + liquorSub);
-  var etcSub    = N(labelVal_(values, '③ 수리·관리·인건비', 3)) || (repair.subtotal + labor.subtotal);
+  var laborSub  = labor.subtotal  || N(labelVal_(values, '③ 인건비', 3))     || sumItems_(labor.items);
+  var repairSub = repair.subtotal || N(labelVal_(values, '④ 수리·관리비', 3)) || sumItems_(repair.items);
 
   /* --- 참고 메모 ('■ 참고' 줄 아래의 '·' 줄만) --- */
   var notes = [];
@@ -193,10 +195,13 @@ function parseMonth_(values, month, title, months) {
         onsite: { subtotal: onsiteSub, items: onsite.items },
         liquor: { subtotal: liquorSub, items: liquor.items }
       },
+      labor: { subtotal: laborSub, items: labor.items },
+      repair: { subtotal: repairSub, items: repair.items },
+      /* 구버전 화면(③ 수리·관리·인건비 한 카드)을 쓰는 폰을 위한 호환 값 */
       etc: {
-        subtotal: etcSub,
-        repair: { subtotal: repair.subtotal, items: repair.items },
-        labor: { subtotal: labor.subtotal, items: labor.items }
+        subtotal: laborSub + repairSub,
+        repair: { subtotal: repairSub, items: repair.items },
+        labor: { subtotal: laborSub, items: labor.items }
       }
     },
     notes: notes
@@ -212,26 +217,35 @@ function section_(values, subtotalNeedle) {
   }
   if (e < 0) return { subtotal: 0, items: [] };
 
+  /* 표 머리글 줄 찾기 — '유형'/'날짜'/'이름' 중 하나가 있는 줄.
+     (③ 인건비 표는 A열이 비어 있고 B열이 '이름'이라 어느 열에 있든 찾습니다) */
   var h = -1;
   for (var b = e - 1; b >= 0 && b >= e - 40; b--) {
+    for (var c0 = 0; c0 < values[b].length; c0++) {
+      var hv = NM(values[b][c0]);
+      if (hv === '유형' || hv === '날짜' || hv === '이름') { h = b; break; }
+    }
+    if (h >= 0) break;
     var a = NM(values[b][0]);
-    if (a === '유형' || a === '날짜') { h = b; break; }
     if (a.indexOf('소계') >= 0 || a.indexOf('■') >= 0) break;
   }
 
   var items = [];
   if (h >= 0) {
     var header = values[h].map(T);
-    var isDate = NM(header[0]) === '날짜';
-    var isName = false;
-    for (var c = 0; c < header.length; c++) if (NM(header[c]) === '이름') isName = true;
+    var isDate = false, isName = false;
+    for (var c = 0; c < header.length; c++) {
+      var hn = NM(header[c]);
+      if (hn === '날짜') isDate = true;
+      if (hn === '이름') isName = true;
+    }
 
     for (var r = h + 1; r < e; r++) {
       var row = values[r];
       var any = false;
       for (var q = 0; q < row.length; q++) if (T(row[q]) !== '') { any = true; break; }
       if (!any) continue;
-      if (isDate) {
+      if (isDate && !isName) {
         items.push({ date: T(row[0]), vendor: T(row[1]), memo: T(row[2]), amount: num_(row[3]) });
       } else if (isName) {
         items.push({ type: T(row[0]), name: T(row[1]), amount: num_(row[2]), memo: T(row[3]) });
@@ -245,11 +259,13 @@ function section_(values, subtotalNeedle) {
 
 /* ------------------------------------------------------------
  *  '월별 추이' 시트 → 월별 배열
+ *    A~H 8열: 월 · 총매출 · 총지출 · 순익 · 현금 · 카드 · 이체
+ *    아래 표: 월 · ① 고정비 · ② 물품비용 · 온라인 · 현장 · 주류·음료 · ③ 인건비 · ④ 수리·관리비
  * ---------------------------------------------------------- */
 function parseTrend_(sh) {
   if (!sh) return [];
   var T = txt_, N = num_, NM = norm_;
-  var values = sh.getDataRange().getValues().map(function (r) { return r.slice(0, 7); });
+  var values = sh.getDataRange().getValues().map(function (r) { return r.slice(0, 8); });
   var map = {}, order = [];
 
   var hi = -1;
@@ -263,7 +279,8 @@ function parseTrend_(sh) {
       map[m] = {
         month: m, revenue: N(values[j][1]), expense: N(values[j][2]), profit: N(values[j][3]),
         cash: N(values[j][4]), card: N(values[j][5]), transfer: N(values[j][6]),
-        fixed: 0, goods: 0, online: 0, onsite: 0, liquor: 0, etc: 0
+        fixed: 0, goods: 0, online: 0, onsite: 0, liquor: 0,
+        labor: null, repair: null, etc: 0
       };
       order.push(m);
     }
@@ -274,19 +291,45 @@ function parseTrend_(sh) {
     if (NM(values[p][0]) === '월' && NM(values[p][1]).indexOf('①고정비') >= 0) { hj = p; break; }
   }
   if (hj >= 0) {
+    /* 머리글 이름으로 열 위치를 확인 (열이 늘거나 순서가 바뀌어도 따라감) */
+    var idx = { fixed: 1, goods: 2, online: 3, onsite: 4, liquor: 5, labor: 6, repair: 7, etc: -1 };
+    var hdr = (values[hj] || []).map(NM);
+    for (var c = 0; c < hdr.length; c++) {
+      var hv = hdr[c];
+      if (!hv) continue;
+      if (hv.indexOf('①') === 0) idx.fixed = c;
+      else if (hv.indexOf('②') === 0) idx.goods = c;
+      else if (hv.indexOf('온라인') >= 0) idx.online = c;
+      else if (hv.indexOf('현장') >= 0) idx.onsite = c;
+      else if (hv.indexOf('주류') >= 0) idx.liquor = c;
+      else if (hv.indexOf('수리') >= 0 && hv.indexOf('인건비') >= 0) idx.etc = c;
+      else if (hv.indexOf('인건비') >= 0) idx.labor = c;
+      else if (hv.indexOf('수리') >= 0) idx.repair = c;
+    }
+
     for (var q = hj + 1; q < values.length; q++) {
       var mm = T(values[q][0]);
       if (!/^\d{1,2}월$/.test(mm)) { if (mm === '') continue; break; }
       if (!map[mm]) {
-        map[mm] = { month: mm, revenue: 0, expense: 0, profit: 0, cash: 0, card: 0, transfer: 0 };
+        map[mm] = {
+          month: mm, revenue: 0, expense: 0, profit: 0, cash: 0, card: 0, transfer: 0,
+          fixed: 0, goods: 0, online: 0, onsite: 0, liquor: 0, labor: null, repair: null, etc: 0
+        };
         order.push(mm);
       }
-      map[mm].fixed  = N(values[q][1]);
-      map[mm].goods  = N(values[q][2]);
-      map[mm].online = N(values[q][3]);
-      map[mm].onsite = N(values[q][4]);
-      map[mm].liquor = N(values[q][5]);
-      map[mm].etc    = N(values[q][6]);
+      map[mm].fixed  = N(values[q][idx.fixed]);
+      map[mm].goods  = N(values[q][idx.goods]);
+      map[mm].online = N(values[q][idx.online]);
+      map[mm].onsite = N(values[q][idx.onsite]);
+      map[mm].liquor = N(values[q][idx.liquor]);
+      if (idx.etc >= 0) {
+        /* 예전 7열 구조: ③ 수리·관리·인건비 한 칸 */
+        map[mm].etc = N(values[q][idx.etc]);
+      } else {
+        map[mm].labor  = N(values[q][idx.labor]);
+        map[mm].repair = N(values[q][idx.repair]);
+        map[mm].etc    = map[mm].labor + map[mm].repair;
+      }
     }
   }
   return order.map(function (m) { return map[m]; });
@@ -301,6 +344,12 @@ function labelVal_(values, label, col) {
     if (norm_(values[i][col]) === target) return values[i][col + 1];
   }
   return '';
+}
+
+function sumItems_(items) {
+  var s = 0;
+  for (var i = 0; i < (items || []).length; i++) s += num_(items[i].amount);
+  return s;
 }
 
 function lastNumber_(row) {
@@ -339,6 +388,8 @@ function testRun() {
     month: data.month,
     summary: data.summary,
     goods: data.expense && data.expense.goods && data.expense.goods.subtotal,
+    labor: data.expense && data.expense.labor && data.expense.labor.subtotal,
+    repair: data.expense && data.expense.repair && data.expense.repair.subtotal,
     daily: data.daily && data.daily.length,
     trend: (data.trend || []).map(function (t) { return t.month + ':' + t.revenue; })
   }, null, 2));
