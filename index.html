@@ -465,7 +465,7 @@ function jsonp(url) {
     }
     window[cb] = data => { cleanup(); resolve(data); };
     s.onerror = () => { cleanup(); reject(new Error('network')); };
-    s.src = url + '&callback=' + cb;
+    s.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
     document.head.appendChild(s);
   });
 }
