@@ -417,7 +417,7 @@ const wonK  = n => {
   n = Number(n) || 0;
   const a = Math.abs(n);
   if (a >= 100000000) return (n / 100000000).toFixed(a >= 1000000000 ? 1 : 2).replace(/\.0+$/, '') + '억';
-  if (a >= 10000) return Math.round(n / 10000) + '만';
+  if (a >= 10000) return nf.format(Math.round(n / 10000)) + '만';
   return nf.format(n);
 };
 const pct = r => (Number(r) * 100).toFixed(Math.abs(Number(r)) < 0.001 ? 0 : 1) + '%';
