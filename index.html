@@ -791,7 +791,7 @@ function buildCats(exp, totalExpense) {
       no: '①', title: '고정비', sub: '월세 · 공과금 · 구독',
       amount: sum(f),
       groups: [{
-        label: '', items: (f.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount }))
+        label: '', amount: sum(f), items: (f.items || []).map(x => ({ name: x.name, memo: x.memo, amount: x.amount }))
       }]
     },
     {
@@ -807,14 +807,14 @@ function buildCats(exp, totalExpense) {
       no: '③', title: '인건비', sub: '알바 급여',
       amount: sum(lb),
       groups: [{
-        label: '', items: (lb.items || []).map(x => ({ name: x.name || x.type, memo: x.memo || '', amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
+        label: '', amount: sum(lb), items: (lb.items || []).map(x => ({ name: x.name || x.type, memo: x.memo || '', amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
       }]
     },
     {
       no: '④', title: '수리·관리비', sub: '수리 · 기타 비정기 지출',
       amount: sum(rp),
       groups: [{
-        label: '', items: (rp.items || []).map(x => ({ name: x.name || x.type, memo: [x.type && x.name ? x.type : '', x.memo].filter(Boolean).join(' · '), amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
+        label: '', amount: sum(rp), items: (rp.items || []).map(x => ({ name: x.name || x.type, memo: [x.type && x.name ? x.type : '', x.memo].filter(Boolean).join(' · '), amount: x.amount })).filter(x => x.name || Number(x.amount) > 0)
       }]
     }
   ].map(c => ({ ...c, share: totalExpense ? c.amount / totalExpense : 0 }));
@@ -822,6 +822,7 @@ function buildCats(exp, totalExpense) {
 
 function catCard(c, idx) {
   const groups = c.groups.filter(g => (g.items && g.items.length) || g.amount > 0);
+  if (!groups.length) groups.push({ label: '', amount: c.amount, items: [] });
   const showLabel = groups.length > 1;
   const body = groups.map(g => {
     let h = '';
