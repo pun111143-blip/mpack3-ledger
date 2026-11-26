@@ -597,7 +597,9 @@ async function fetchMonth(month) {
   state.busy = true;
   $('#btnRefresh').classList.add('busy');
   const pin = sessionPin || (state.pinBuf.length === 4 ? state.pinBuf : '');
-  const res = await apiGet({ pin, month: month || '' });
+  // 저장된 달이 없으면 '이번 달'을 먼저 요청합니다. (시트에 그 달이 없으면 서버가 최근 달로 돌려줍니다)
+  const cur = (new Date().getMonth() + 1) + '월';
+  const res = await apiGet({ pin, month: month || cur });
   state.busy = false;
   $('#btnRefresh').classList.remove('busy');
 
