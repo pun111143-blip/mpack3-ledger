@@ -160,9 +160,14 @@ function parseMonth_(values, month, title, months) {
   var goodsSub  = N(labelVal_(values, '② 물품비용', 3)) || (onlineSub + onsiteSub + liquorSub);
   var etcSub    = N(labelVal_(values, '③ 수리·관리·인건비', 3)) || (repair.subtotal + labor.subtotal);
 
-  /* --- 참고 메모 --- */
+  /* --- 참고 메모 ('■ 참고' 줄 아래의 '·' 줄만) --- */
   var notes = [];
-  for (var k = 0; k < values.length; k++) {
+  var noteStart = -1;
+  for (var s0 = 0; s0 < values.length; s0++) {
+    if (NM(values[s0][0]).indexOf('■참고') === 0) { noteStart = s0; break; }
+  }
+  for (var k = Math.max(0, noteStart); k < values.length; k++) {
+    if (noteStart < 0) break;
     var cell = T(values[k][0]);
     if (cell.indexOf('·') === 0) notes.push(cell.replace(/^·\s*/, ''));
   }
