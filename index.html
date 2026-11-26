@@ -253,7 +253,7 @@ html[data-theme="light"] .tabs button.on{background:#101A2E;color:#fff}
 
 /* 일별 표 */
 .tbl{padding:0}
-.tbl .tr{display:grid;grid-template-columns:44px 1fr 1fr 1fr 1fr;align-items:center;gap:4px;padding:7px 12px;font-size:12px}
+.tbl .tr{display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;align-items:center;gap:4px;padding:7px 12px;font-size:11.5px}
 .tbl .td{text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .tbl .thead{font-size:10.5px;color:var(--muted);font-weight:600;padding-top:2px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .tbl .thead .td{font-weight:600}
@@ -288,8 +288,8 @@ html[data-theme="light"] .tabs button.on{background:#101A2E;color:#fff}
 .bar-track i.rev{background:var(--mint)}
 .bar-track i.exp{background:var(--rose)}
 .bar-row .v{font-size:11px;color:var(--sub);width:62px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px}
-.split .kv{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-top:10px}
+.split .kv{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--line)}
 .split .kv span{color:var(--muted)}
 .split .kv b{font-weight:600;font-variant-numeric:tabular-nums}
 
@@ -930,7 +930,7 @@ function renderTrend() {
 
 function renderFoot() {
   const src = state.demo ? '예시 데이터' : '구글 시트 「📊 엠팩3노래연습장 가계부 2026」';
-  $('#foot').innerHTML = `데이터: ${src}<br>${state.demo ? '실제 금액이 아닙니다 (안내용)' : 'Numbers come from the sheet · ' + (state.api ? '실시간 연결' : '연결 전')}`;
+  $('#foot').innerHTML = `데이터: ${src}<br>${state.demo ? '실제 금액이 아닙니다 (안내용)' : (state.api ? '시트에서 실시간으로 받아옵니다' : '시트 연결 전')}`;
 }
 
 /* ============================================================
@@ -991,8 +991,8 @@ function demoPayload(month) {
 }
 function demoTrend() {
   return [
-    { month: '10월', revenue: 13200000, expense: 10800000, profit: 2400000, cash: 1400000, card: 10400000, transfer: 1400000, fixed: 4100000, goods: 2900000, etc: 3800000 },
-    { month: '11월', revenue: 12800000, expense: 11000000, profit: 1800000, cash: 1500000, card: 9900000, transfer: 1400000, fixed: 4300000, goods: 2900000, etc: 3800000 }
+    { month: '11월', revenue: 9200000, expense: 7100000, profit: 2100000, cash: 1100000, card: 7200000, transfer: 900000, fixed: 4700000, goods: 2000000, etc: 400000 },
+    { month: '12월', revenue: 3100000, expense: 4400000, profit: -1300000, cash: 350000, card: 2400000, transfer: 350000, fixed: 4300000, goods: 100000, etc: 0 }
   ];
 }
 
@@ -1078,6 +1078,7 @@ $('#btnRefresh').onclick = async () => {
   toast('최신 데이터로 갱신했습니다');
 };
 $('#btnLock').onclick = () => {
+  state.demo = false;
   showGate();
   state.pinBuf = '';
   drawDots();
