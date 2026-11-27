@@ -203,6 +203,20 @@ html[data-theme="light"] .tabs button.on{background:#101A2E;color:#fff}
 .spark-wrap{margin-top:10px}
 .spark-legend{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px}
 
+/* 세금 적립(월 75만) 후 실가용액 */
+.card.taxline{
+  padding:12px 14px;margin-bottom:10px;
+  background:linear-gradient(100deg,var(--amber-soft) 0%,rgba(0,0,0,0) 78%),linear-gradient(180deg,var(--card),var(--card));
+}
+.taxline .tl-label{font-size:11.5px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px}
+.taxline .tl-label i{width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none}
+.taxline .tl-value{font-size:19px;font-weight:800;letter-spacing:-.03em;margin-top:3px;line-height:1.15;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.taxline .tl-value small{font-size:12px;font-weight:600;color:var(--sub);margin-left:2px;letter-spacing:0}
+.taxline .tl-value.pos{color:var(--mint)}
+.taxline .tl-value.neg{color:var(--rose)}
+.taxline .tl-value.none{color:var(--muted);font-size:15px;font-weight:700}
+.taxline .tl-note{font-size:10.5px;color:var(--muted);margin-top:3px}
+
 /* 매출 비중 */
 .card{
   background:linear-gradient(180deg,var(--card),var(--card));
@@ -713,6 +727,19 @@ function renderMonth() {
       <div class="value num ${profit >= 0 ? 'mint' : 'rose'}">${profit >= 0 ? '' : '-'}${wonK(Math.abs(profit))}<small>원</small></div>
       <div style="font-size:10.5px;color:var(--muted);margin-top:4px">이익률 ${revenue ? pct(profitRate) : '-'}</div>
     </div>
+  </section>`;
+
+  /* --- 세금 적립(월 75만) 후 실가용액 (순익에서 750,000원을 떼어 둔 참고 금액) --- */
+  const TAX_RESERVE = 750000;
+  const afterTax = profit - TAX_RESERVE;
+  html += `
+  <section class="card taxline">
+    <div class="tl-label"><i></i>세금 적립(월 75만) 후 실가용액</div>
+    ${revenue
+      ? `<div class="tl-value ${afterTax >= 0 ? 'pos' : 'neg'}">${afterTax >= 0 ? '' : '-'}${won(Math.abs(afterTax))}<small>원</small></div>
+         <div class="tl-note">순익 ${profit >= 0 ? '' : '-'}${won(Math.abs(profit))}원 − 세금 적립 750,000원</div>`
+      : `<div class="tl-value none">산정 전</div>
+         <div class="tl-note">이번 달 매출이 입력되면 표시됩니다</div>`}
   </section>`;
 
   /* --- 매출 비중 --- */
